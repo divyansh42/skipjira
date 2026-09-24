@@ -9,7 +9,7 @@ import (
 
 // PRStateToJiraStatus maps PR states to desired Jira status
 // Note: We never automatically close tickets - "Dev Complete" is the furthest we go
-func PRStateToJiraStatus(prState github.PRState) string {
+func PRStateToJiraStatus(prState github.PRState, issueType string) string {
 	switch prState {
 	case github.PRStateDraft, github.PRStateChangesRequested:
 		return "In Progress"
@@ -18,6 +18,10 @@ func PRStateToJiraStatus(prState github.PRState) string {
 	case github.PRStateApproved:
 		return "Code Review"
 	case github.PRStateMerged:
+		// Vulnerability tickets skip testing and go directly to Release Pending
+		if strings.EqualFold(issueType, "Vulnerability") {
+			return "Release Pending"
+		}
 		return "Dev Complete"
 	case github.PRStateClosed:
 		// Closed without merge goes back to In Progress (work abandoned/needs redo)
