@@ -40,9 +40,7 @@ repositories:
     name: triggers
 
 users:
-  - ab-ghosh
   - adityavshinde
-  - anithapriyanatarajan
   - ankrsinha
   - anwesha-palit-redhat
   - arvindk-softwaredev
@@ -52,12 +50,13 @@ users:
   - divyansh42
   - enarha
   - infernus01
-  - jayesh-garg 
   - jkhelil
   - khrm
+  - krishhlogan
   - manthinasai
   - mathur07
-  - mbpavan
+  - mzgutman
+  - ngelman1
   - pramodbindal
   - pratap0007
   - savitaashture
