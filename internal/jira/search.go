@@ -55,7 +55,7 @@ func (c *Client) SearchIssuesWithStatusByJQL(jql string) ([]SearchIssue, error) 
 
 	payload := map[string]interface{}{
 		"jql":        jql,
-		"fields":     []string{"key", "status", "summary"},
+		"fields":     []string{"key", "status", "summary", "issuetype"},
 		"maxResults": 100,
 	}
 

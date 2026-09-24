@@ -3,6 +3,7 @@ package jirasync
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -13,6 +14,16 @@ import (
 	"github.com/openshift-pipelines/skipjira/internal/releasenotes"
 	"github.com/openshift-pipelines/skipjira/internal/slack"
 )
+
+// skipTransitionStatuses lists Jira statuses that should never be moved by jirasync.
+// Tickets already in these states are left as-is; release notes still proceed normally.
+var skipTransitionStatuses = []string{
+	"Closed",
+	"Done",
+	"Release Pending",
+	"On QA",
+	"Testing",
+}
 
 // Syncer coordinates PR to Jira ticket synchronization
 type Syncer struct {
@@ -101,8 +112,9 @@ func (s *Syncer) SyncAll(ctx context.Context, repositories []Repository, users [
 	globalTicketPRs := make(map[string][]repoPRInfo)
 	// Track tickets with full metadata for Slack notifications
 	globalTicketInfo := make(map[string]struct {
-		Status  string
-		Summary string
+		Status    string
+		Summary   string
+		IssueType string
 	})
 	results := make([]SyncResult, len(repositories))
 	unlinkedPRs := 0
@@ -147,8 +159,8 @@ func (s *Syncer) SyncAll(ctx context.Context, repositories []Repository, users [
 				continue
 			}
 
-			// Check if this maps to a Jira status
-			targetStatus := PRStateToJiraStatus(prState)
+			// Check if this maps to a Jira status (issue type unknown at this point)
+			targetStatus := PRStateToJiraStatus(prState, "")
 			if targetStatus == "" {
 				results[repoIdx].PRsProcessed++
 				continue
@@ -209,10 +221,18 @@ func (s *Syncer) SyncAll(ctx context.Context, repositories []Repository, users [
 						summary = summaryField
 					}
 
+					issueType := ""
+					if typeField, ok := issue.Fields["issuetype"].(map[string]interface{}); ok {
+						if name, ok := typeField["name"].(string); ok {
+							issueType = name
+						}
+					}
+
 					globalTicketInfo[issue.Key] = struct {
-						Status  string
-						Summary string
-					}{Status: status, Summary: summary}
+						Status    string
+						Summary   string
+						IssueType string
+					}{Status: status, Summary: summary, IssueType: issueType}
 				}
 			}
 
@@ -240,9 +260,9 @@ func (s *Syncer) SyncAll(ctx context.Context, repositories []Repository, users [
 
 		fmt.Printf("Processing %s (current: '%s')\n", issueKey, info.Status)
 
-		// Skip tickets in terminal states
-		if info.Status == "Closed" || info.Status == "Done" {
-			fmt.Printf("  ⊗ Already in terminal state '%s' - skipping\n", info.Status)
+		// Skip tickets in states that should not be moved back
+		if slices.Contains(skipTransitionStatuses, info.Status) {
+			fmt.Printf("  ⊗ Already in '%s' - skipping transition\n", info.Status)
 			continue
 		}
 		// Find the most behind PR across all repos
@@ -253,7 +273,7 @@ func (s *Syncer) SyncAll(ctx context.Context, repositories []Repository, users [
 			}
 		}
 
-		targetStatus := PRStateToJiraStatus(mostBehind.state)
+		targetStatus := PRStateToJiraStatus(mostBehind.state, info.IssueType)
 		fmt.Printf("  PR #%d state: %s → Jira target: '%s'\n", mostBehind.number, mostBehind.state, targetStatus)
 
 		// Log which repos have PRs for this ticket
