@@ -54,40 +54,54 @@ func main() {
 	// Parse arguments
 	var repos []jirasync.Repository
 	var configuredUsers []string
+	sinceStr := ""
 
-	if len(os.Args) == 1 {
-		// No args - use default
+	args := os.Args[1:]
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--config":
+			if i+1 >= len(args) {
+				fmt.Println("Usage: go run ./test/jirasync --config <config-file>")
+				os.Exit(1)
+			}
+			cfg, err := jirasync.LoadConfig(args[i+1])
+			if err != nil {
+				fmt.Printf("Error loading config: %v\n", err)
+				os.Exit(1)
+			}
+			repos = cfg.Repositories
+			configuredUsers = cfg.Users
+			i++
+		case "--since":
+			if i+1 >= len(args) {
+				fmt.Println("--since requires a date argument (e.g. 2024-01-01)")
+				os.Exit(1)
+			}
+			sinceStr = args[i+1]
+			i++
+		default:
+			if len(args)-i >= 2 && !strings.HasPrefix(args[i], "--") {
+				repos = []jirasync.Repository{{Owner: args[i], Name: args[i+1]}}
+				i++
+			}
+		}
+	}
+
+	if len(repos) == 0 {
 		repos = []jirasync.Repository{
 			{Owner: "openshift-pipelines", Name: "skipjira"},
 		}
-	} else if os.Args[1] == "--config" {
-		// Config file mode
-		if len(os.Args) < 3 {
-			fmt.Println("Usage: go run ./test/jirasync --config <config-file>")
-			fmt.Println("   or: go run ./test/jirasync <owner> <repo>")
-			os.Exit(1)
-		}
-		cfg, err := jirasync.LoadConfig(os.Args[2])
-		if err != nil {
-			fmt.Printf("Error loading config: %v\n", err)
-			os.Exit(1)
-		}
-		repos = cfg.Repositories
-		configuredUsers = cfg.Users
-	} else if len(os.Args) >= 3 {
-		// Single repo mode
-		repos = []jirasync.Repository{
-			{Owner: os.Args[1], Name: os.Args[2]},
-		}
-	} else {
-		fmt.Println("Usage: go run ./test/jirasync                         # test openshift-pipelines/skipjira")
-		fmt.Println("   or: go run ./test/jirasync <owner> <repo>          # test single repo")
-		fmt.Println("   or: go run ./test/jirasync --config <config-file>  # test multiple repos")
-		os.Exit(1)
 	}
 
-	// Test with PRs from last 7 days
 	sinceTime := time.Now().AddDate(0, 0, -7)
+	if sinceStr != "" {
+		parsed, err := jirasync.ParseDate(sinceStr)
+		if err != nil {
+			fmt.Printf("Error parsing --since: %v\n", err)
+			os.Exit(1)
+		}
+		sinceTime = parsed
+	}
 
 	fmt.Printf("Testing jirasync flow for %d repository(ies)\n", len(repos))
 	fmt.Printf("Fetching PRs updated since %s\n\n", sinceTime.Format("2006-01-02"))
