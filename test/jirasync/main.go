@@ -167,7 +167,7 @@ func main() {
 				continue
 			}
 
-			targetStatus := jirasync.PRStateToJiraStatus(state)
+			targetStatus := jirasync.PRStateToJiraStatus(state, "")
 			if targetStatus == "" {
 				continue
 			}
@@ -288,7 +288,7 @@ func main() {
 			fmt.Printf("  %s [%s] PR #%d (%s) - %s\n", marker, repoName, pr.number, pr.state, pr.title)
 		}
 
-		targetStatus := jirasync.PRStateToJiraStatus(mostBehind.state)
+		targetStatus := jirasync.PRStateToJiraStatus(mostBehind.state, "")
 		if len(repoSet) > 1 {
 			fmt.Printf("  ⚠ PRs span %d repositories\n", len(repoSet))
 		}
